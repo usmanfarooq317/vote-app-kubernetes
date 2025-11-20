@@ -1,5 +1,6 @@
 from flask import Flask, render_template_string
 import psycopg2
+import time
 
 app = Flask(__name__)
 
@@ -44,16 +45,38 @@ HTML_TEMPLATE = """
 </html>
 """
 
+# Wait for Postgres to be ready
+def connect_db():
+    while True:
+        try:
+            conn = psycopg2.connect(**DB_CONFIG)
+            return conn
+        except Exception:
+            print("Waiting for Postgres...")
+            time.sleep(2)
+
+# Create table once at startup
+conn = connect_db()
+cursor = conn.cursor()
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS votes (
+        id SERIAL PRIMARY KEY,
+        animal TEXT NOT NULL
+    );
+""")
+conn.commit()
+cursor.close()
+conn.close()
+
+
 def get_results():
-    conn = psycopg2.connect(**DB_CONFIG)
+    conn = connect_db()
     cursor = conn.cursor()
 
-    cursor.execute("CREATE TABLE IF NOT EXISTS votes (id SERIAL PRIMARY KEY, vote_text VARCHAR(50));")
-
-    cursor.execute("SELECT COUNT(*) FROM votes WHERE vote_text='cats';")
+    cursor.execute("SELECT COUNT(*) FROM votes WHERE animal='cats';")
     cats = cursor.fetchone()[0]
 
-    cursor.execute("SELECT COUNT(*) FROM votes WHERE vote_text='dogs';")
+    cursor.execute("SELECT COUNT(*) FROM votes WHERE animal='dogs';")
     dogs = cursor.fetchone()[0]
 
     cursor.close()

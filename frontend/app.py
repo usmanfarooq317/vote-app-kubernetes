@@ -23,7 +23,7 @@ button:hover { opacity: 0.8; }
 <body>
 <h1>Vote for Your Favorite!</h1>
 
-<form method="post" action="/">
+<form method="post" action="">
   <button class="vote-btn" name="vote" value="cats">Vote Cats</button>
   <button class="vote-btn" name="vote" value="dogs">Vote Dogs</button>
 </form>
