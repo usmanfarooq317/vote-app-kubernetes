@@ -1,42 +1,39 @@
-import time
 import redis
 import psycopg2
+import time
 
-# Redis
 redis_client = redis.Redis(host="redis", port=6379, db=0)
 
-# Postgres
 while True:
     try:
-        db = psycopg2.connect(
-            host="postgres",
-            user="postgres",
-            password="postgres",
-            database="votesdb"
-        )
-        break
+        vote = redis_client.blpop("votes", timeout=5)
+        if vote:
+            vote = vote[1].decode("utf-8")
+            print("Processing vote:", vote)
+
+            conn = psycopg2.connect(
+                host="postgres",
+                user="postgres",
+                password="postgres",
+                database="votesdb"
+            )
+            cursor = conn.cursor()
+
+            # Ensure table exists
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS votes (
+                    id SERIAL PRIMARY KEY,
+                    vote_text VARCHAR(50)
+                );
+            """)
+
+            cursor.execute("INSERT INTO votes (vote_text) VALUES (%s)", (vote,))
+
+            conn.commit()
+            cursor.close()
+            conn.close()
+
     except Exception as e:
-        print("DB not ready, retrying in 3 sec...")
-        time.sleep(3)
-        
-cursor = db.cursor()
+        print("Worker Error:", e)
 
-cursor.execute("""
-CREATE TABLE IF NOT EXISTS votes (
-    id SERIAL PRIMARY KEY,
-    vote TEXT NOT NULL
-)
-""")
-db.commit()
-
-print("Worker started...")
-
-while True:
-    vote = redis_client.lpop("votes")
-    if vote:
-        vote = vote.decode()
-        print("Processing vote:", vote)
-        cursor.execute("INSERT INTO votes (vote) VALUES (%s)", (vote,))
-        db.commit()
-    else:
-        time.sleep(1)
+    time.sleep(1)
